@@ -21,46 +21,51 @@ def measure_run_time(simulator, steps):
 
     return elapsed
 
-ns = numpy.power(10, numpy.arrange(1.5, 5.0, 0.5)).astype(int)
 
 with species_attributes():
     A | { 'radius': '1e-8', 'D': '1.0e-12' }
 
-m = get_model()
+model = get_model()
 
-def profile_fixed_volume(factories):
+def profile_fixed_volume(ns, factories):
     world_size = Real3(3.42e-6, 3.42e-6, 3.42e-6) # V = 40fL
-    fixed_volume_elapsed = {}
+    elapsed_list = {}
     for solver, (f, is_scale) in factories.items():
-        fixed_volume_elapsed[solver] = []
+        elapsed_list[solver] = []
         for num in ns:
             world = f.create_world(world_size)
-            world.bind_to(m)
+            world.bind_to(model)
             world.add_molecules(Species('A'), num)
-            s = factory.create_simulator(model, world)
+            s = f.create_simulator(model, world)
             num_steps = num*NUM_STEPS if is_scale else NUM_STEPS
             elapsed = measure_run_time(s, num_steps)
-            fixed_volume_elapsed[solver].append(elapsed)
+            elapsed_list[solver].append(elapsed)
+    return elapsed_list
 
-def profile_fixed_concentration(factories):
-    fixed_concentration_elapsed = {}
-    for solver, (f, is_scale) in factories.items():
-        fixed_concentration_elapsed[solver] = []
-        for num in ns:
-            edge = math.pow(num/60.0, 1./3.)*1.0e-6
-            world = f.create_world(Real3(edge, edge, edge))
-            world.bind_to(m)
-            world.add_molecules(Species('A'), num)
-            s = factory.create_simulator(model, world)
-            num_steps = num*NUM_STEPS if is_scale else NUM_STEPS
-            elapsed = measure_run_time(s, num_steps)
-            fixed_concentration_elapsed[solver].append(elapsed)
+#def profile_fixed_concentration(factories):
+#    fixed_concentration_elapsed = {}
+#    for solver, (f, is_scale) in factories.items():
+#        fixed_concentration_elapsed[solver] = []
+#        for num in ns:
+#            edge = math.pow(num/60.0, 1./3.)*1.0e-6
+#            world = f.create_world(Real3(edge, edge, edge))
+#            world.bind_to(m)
+#            world.add_molecules(Species('A'), num)
+#            s = factory.create_simulator(model, world)
+#            num_steps = num*NUM_STEPS if is_scale else NUM_STEPS
+#            elapsed = measure_run_time(s, num_steps)
+#            fixed_concentration_elapsed[solver].append(elapsed)
 
 if __name__ == '__main__':
+    ns = numpy.power(10, numpy.arange(1.5, 5.0, 0.5)).astype(int)
     factories = {
         "spatiocyte" : (spatiocyte.SpatiocyteFactory(voxel_radius=1.0e-8), False),
-        "egfrd"      : (egfrd.EGFRDFactory(matrix_sizes=Integer3(3,3,3)), True),
-        "bd"         : (bd.BDFactory(), True)
+        "egfrd"      : (egfrd.EGFRDFactory(Integer3(3,3,3)), True)
     }
-    profile_fixed_volume(factories)
-    profile_fixed_concentration(factories[:1])
+    elapsed_list = profile_fixed_volume(ns, factories)
+    #profile_fixed_concentration(ns, factories[:1])
+
+    for (solver, elapsed) in elapsed_list.items():
+        with open(solver+'.tsv', 'w') as f:
+            for (num, time) in zip(ns, elapsed):
+                print >> f,  num, time
