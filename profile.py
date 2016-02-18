@@ -5,9 +5,9 @@ import math
 import numpy
 from ecell4 import *
 
-DURATION = 1.0 # sec
+# DURATION = 1.0 # sec
 NUM_STEPS = 10000
-RUN_LIMIT = 10.0 # sec
+RUN_LIMIT = 1000.0 # sec
 
 def measure_run_time(simulator, steps):
     elapsed = 0
