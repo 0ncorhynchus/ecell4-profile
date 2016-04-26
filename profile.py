@@ -1,8 +1,10 @@
 #! /usr/bin/env python
 
+from __future__ import print_function
 import time
 import math
 import numpy
+import sys
 from functools import partial
 from ecell4 import *
 
@@ -26,7 +28,6 @@ def measure_run_time(simulator, steps):
         if (elapsed >= RUN_LIMIT):
             elapsed *= float(steps) / (i+1)
             break
-    print("steps:{}, t:{}".format(steps, simulator.t()))
     return elapsed / simulator.t()
 
 def num_partitions(L, N):
@@ -38,16 +39,21 @@ def create_world(factory, L, num):
     world.add_molecules(Species('A'), num)
     return world
 
+TRIALS = 5
 def profile(edge_length_method, rng, constructor, scaled_step, *args):
-    elapsed_time = []
+    elapsed_collection = []
     for num in ns:
         edge_length = edge_length_method(num)
-        factory = constructor(edge_length, num, rng, *args)
-        world = create_world(factory, edge_length, num)
-        simulator = factory.create_simulator(model, world)
+        elapsed_times = []
         steps_per_cycle = num if scaled_step else 1
-        elapsed_time.append(measure_run_time(simulator, int(steps_per_cycle * NUM_STEPS)))
-    return elapsed_time
+        num_steps = steps_per_cycle * NUM_STEPS
+        factory = constructor(edge_length, num, rng, *args)
+        for _ in range(TRIALS):
+            world = create_world(factory, edge_length, num)
+            simulator = factory.create_simulator(model, world)
+            elapsed_times.append(measure_run_time(simulator, num_steps))
+        elapsed_collection.append(elapsed_times)
+    return elapsed_collection
 
 def get_edge_length_with_40fL(num):
     return 3.42e-6
@@ -80,10 +86,9 @@ profile_methods = {
 }
 
 def print_usage(methods, factories):
-    print("USAGE: python profile.py [" + "|".join(methods) + "] [" + "|".join(factories) + "] <int>")
+    print("USAGE: python profile.py [" + "|".join(methods) + "] [" + "|".join(factories) + "] <int>", file=sys.stderr)
 
 if __name__ == '__main__':
-    import sys
     argc = len(sys.argv)
     if argc < 3:
         print_usage(profile_methods.keys(), factories.keys())
@@ -97,16 +102,19 @@ if __name__ == '__main__':
         rng.seed(int(sys.argv[3]))
 
     if method not in profile_methods:
-        print("Invalid method")
+        print("Invalid method", file=sys.stderr)
         print_usage(profile_methods.keys(), factories.keys())
         sys.exit(2)
 
     if system not in factories:
-        print("Invalid system")
+        print("Invalid system", file=sys.stderr)
         print_usage(profile_methods.keys(), factories.keys())
         sys.exit(3)
 
     elapsed_time = profile_methods[method](rng, *factories[system])
     with open("tsv/%s_fixed_%s.tsv" % (system, method), 'w') as f:
-        for (num, time) in zip(ns, elapsed_time):
-            print >> f,  num, time
+        for (num, data) in zip(ns, elapsed_time):
+            average = numpy.average(data)
+            std = numpy.std(data)
+            print("{} {} {}".format(num, average, std), file=f)
+
