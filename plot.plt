@@ -1,6 +1,5 @@
 set terminal postscript eps enhanced color
-set terminal png
-set output 'benchmark.png'
+set output 'benchmark.eps'
 set logscale x
 set logscale y
 set xlabel 'N [#particles]'
