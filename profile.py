@@ -14,19 +14,18 @@ with species_attributes():
     A | { 'radius':  str(radius), 'D': '1.0e-12' }
 model = get_model()
 
-ns = numpy.logspace(1.5, 4.5, 7).astype(int)
+ns = numpy.logspace(1.5, 5.5, 9).astype(int)
 
 #NUM_STEPS = 10000
 NUM_STEPS = 100
 RUN_LIMIT = 500.0 # sec
-def measure_run_time(simulator, steps):
+def measure_run_time(simulator, steps_per_cycle):
     elapsed = 0
     start = time.time()
-    for i in range(steps):
+    for i in range(steps_per_cycle * NUM_STEPS):
         simulator.step()
         elapsed = time.time() - start
-        if (elapsed >= RUN_LIMIT):
-            elapsed *= float(steps) / (i+1)
+        if (elapsed >= RUN_LIMIT and i > steps_per_cycle):
             break
     return elapsed / simulator.t()
 
@@ -51,7 +50,7 @@ def profile(edge_length_method, rng, constructor, scaled_step, *args):
         for _ in range(TRIALS):
             world = create_world(factory, edge_length, num)
             simulator = factory.create_simulator(model, world)
-            elapsed_times.append(measure_run_time(simulator, num_steps))
+            elapsed_times.append(measure_run_time(simulator, steps_per_cycle))
         elapsed_collection.append(elapsed_times)
     return elapsed_collection
 
@@ -64,7 +63,7 @@ def get_edge_length_with_100nM(num):
 def create_partitioned_constructor(constructor):
     def make_instance(L, num, rng, *args):
         m = num_partitions(L, num)
-        return constructor(Integer3(m,m,m), *(args + (rng,)))
+        return constructor(Integer3(m,m,m), *((rng,) + args))
     return make_instance
 
 def create_non_partitioned_constructor(constructor):
@@ -76,7 +75,7 @@ def create_non_partitioned_constructor(constructor):
 factories = {
     "spatiocyte" : [create_non_partitioned_constructor(spatiocyte.SpatiocyteFactory), False, radius],
     "egfrd"      : [create_partitioned_constructor(egfrd.EGFRDFactory),               True],
-    "egfrd.bd"   : [create_partitioned_constructor(egfrd.BDFactory),                  False],
+    "egfrd.bd"   : [create_partitioned_constructor(egfrd.BDFactory),                  False, 1e-5],
     "bd.bd"      : [create_partitioned_constructor(bd.BDFactory),                     False],
     "meso"       : [create_non_partitioned_constructor(meso.MesoscopicFactory),       True,  100e-9]
 }
@@ -112,9 +111,6 @@ if __name__ == '__main__':
         sys.exit(3)
 
     elapsed_time = profile_methods[method](rng, *factories[system])
-    with open("tsv/%s_fixed_%s.tsv" % (system, method), 'w') as f:
-        for (num, data) in zip(ns, elapsed_time):
-            average = numpy.average(data)
-            std = numpy.std(data)
-            print("{} {} {}".format(num, average, std), file=f)
+    for (num, data) in zip(ns, elapsed_time):
+        print(" ".join(map(str, [num] + data)))
 

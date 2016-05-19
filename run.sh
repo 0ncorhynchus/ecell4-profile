@@ -7,7 +7,9 @@ seed=$1
 
 for m in ${methods[@]}; do
   for f in ${factories[@]}; do
-    nohup python profile.py $m $f $seed > log/${m}_${f}.out &
+    fname=${f}_fixed_${m}
+    echo "seed=$seed" >> log/${fname}.out
+    nohup python profile.py $m $f $seed > tsv/${fname}.tsv 2>> log/${fname}.out &
   done
 done
 

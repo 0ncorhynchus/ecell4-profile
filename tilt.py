@@ -19,8 +19,10 @@ if __name__ == '__main__':
     import sys
     for fname in sys.argv[1:]:
         lines = readlines(fname)
+        if len(lines) == 0:
+            continue
         center_line = lines[len(lines)/2]
         last_line = lines[-1]
         center_point = log10(line2nums(center_line))
         last_point = log10(line2nums(last_line))
-        print("%s :\t%f" % (fname, get_tilt(center_point, last_point)))
+        print("{0:<35} {1}".format(fname+" :", get_tilt(center_point, last_point)))
